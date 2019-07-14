@@ -19,6 +19,8 @@ class Main:
         self.go = False
         self.goCount = 0
         fontFile = os.path.join(CurrentPath, "freesansbold.ttf")
+        if not os.path.exists(fontFile):
+            fontFile = "freesansbold.ttf"
         self.font = pygame.font.Font(fontFile, 240)
         self.font.set_bold(True)
         self.fontSmall = pygame.font.Font(fontFile, 120)
