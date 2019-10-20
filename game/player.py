@@ -1,9 +1,10 @@
 from random import randint
 import random
+import json
 
 
 class Player:
-    def __init__(self, startX = None, startY = None, startDirection = None, color = (50, 255, 50), window = None, apples = None, players = None, ki = True):
+    def __init__(self, startX = None, startY = None, startDirection = None, color = (50, 255, 50), window = None, apples = None, players = None, ki = True, client = None):
         if startX == None:
             startX = randint(0, 640 / 20 - 1)
         if startY == None:
@@ -18,7 +19,11 @@ class Player:
         self.parts = [[startX, startY]]
         self.count = 0
         self.ki = ki
+        self.dead = False
         self.moved = False
+        self.first = True
+        self.multiplayer = client != None
+        self.client = client
 
     def checkOnApple(self, x, y, destroy = True):
         count = 0
@@ -140,7 +145,8 @@ class Player:
     
     def go(self):
         self.moved = False
-        if self.ki:
+        if self.ki or self.first:
+            self.first = False
             self.changeDirection(self.getBestDirect())
             if self.checkOnDeath(self.calculateDirectCoords(self.parts[0].copy(), self.direction)):
                 if not self.checkOnDeath(self.calculateDirectCoords(self.parts[0].copy(), 0)):
@@ -195,29 +201,47 @@ class Player:
 
     def checkOnDeath(self, coords):
         touch = False
-        for player in self.players:
-            if player == self:
-                parts = self.parts[1:]
-            else:
-                parts = player.parts
-            for part in parts:
-                if part == coords:
-                    touch = True
+        if self.multiplayer:
+            try:
+                for client in self.client.clients:
+                    if client["id"] == self.client.id:
+                        parts = self.parts[1:]
+                    else:
+                        parts = client["Parts"]
+                    for part in parts:
+                        if part == coords:
+                            touch = True
+                            break
+                    if touch:
+                        break
+            except KeyError:
+                pass
+        else:
+            for player in self.players:
+                if player == self:
+                    parts = self.parts[1:]
+                else:
+                    parts = player.parts
+                for part in parts:
+                    if part == coords:
+                        touch = True
+                        break
+                if touch:
                     break
-            if touch:
-                break
         if coords[0] < 0 or coords[1] < 0 or coords[0] > 31 or coords[1] > 23:
             touch = True
         return touch
     
     def die(self):
-        if self.ki:
+        if self.ki and not self.multiplayer:
             for i in range(len(self.players)):
                 if self.players[i] == self:
                     del self.players[i]
                     break
         else:
-            self.window.terminate()
+            if self.multiplayer:
+                self.client.send(json.dumps({"Dead": True}))
+            self.dead = True
     
     def render(self):
         for part in self.parts:
